@@ -10,6 +10,7 @@ import com.example.mindme.data.Task
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
+import com.example.mindme.data.RepeatType
 
 object ReminderScheduler {
 
@@ -65,6 +66,15 @@ object ReminderScheduler {
                 .cancelUniqueWork("task_${task.id}")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Alarm iptal hatası: ${task.title}", e)
+        }
+    }
+    fun getNextOccurrence(dateTime: LocalDateTime, repeatType: RepeatType): LocalDateTime? {
+        return when (repeatType) {
+            RepeatType.NONE -> null
+            RepeatType.DAILY -> dateTime.plusDays(1)
+            RepeatType.WEEKLY -> dateTime.plusWeeks(1)
+            RepeatType.MONTHLY -> dateTime.plusMonths(1)
+            RepeatType.YEARLY -> dateTime.plusYears(1)
         }
     }
 }

@@ -23,5 +23,13 @@ class Converters {
     fun statusToString(status: TaskStatus?): String? {
         return status?.name
     }
+    @TypeConverter
+    fun fromRepeatType(value: String?): RepeatType? {
+        return value?.let { RepeatType.valueOf(it) }
+    }
 
+    @TypeConverter
+    fun repeatTypeToString(repeatType: RepeatType?): String? {
+        return repeatType?.name
+    }
 }

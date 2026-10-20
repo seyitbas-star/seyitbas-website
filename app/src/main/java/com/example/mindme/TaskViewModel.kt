@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
+import com.example.mindme.data.RepeatType
 
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -39,10 +40,14 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    fun addTask(title: String, dueDateTime: LocalDateTime) {
+    fun addTask(title: String, dueDateTime: LocalDateTime, repeatType: RepeatType = RepeatType.NONE) {
         viewModelScope.launch {
             try {
-                val newTask = Task(title = title, dueDateTime = dueDateTime)
+                val newTask = Task(
+                    title = title,
+                    dueDateTime = dueDateTime,
+                    repeatType = repeatType   // ← YENİ
+                )
                 repository.insert(newTask)
                 ReminderScheduler.scheduleReminder(getApplication<Application>(), newTask)
             } catch (e: Exception) {
@@ -75,8 +80,23 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     fun markAsCompleted(task: Task) {
         viewModelScope.launch {
             try {
-                repository.update(task.copy(status = TaskStatus.COMPLETED))
-                ReminderScheduler.cancelReminder(getApplication<Application>(), task)
+                if (task.repeatType == RepeatType.NONE) {
+                    // Tek seferlik görev: Tamamlandı yap, alarmı iptal et
+                    repository.update(task.copy(status = TaskStatus.COMPLETED))
+                    ReminderScheduler.cancelReminder(getApplication<Application>(), task)
+                } else {
+                    // Tekrarlayan görev: Bir sonraki tarihi hesapla
+                    val nextDate = ReminderScheduler.getNextOccurrence(task.dueDateTime, task.repeatType)
+                    if (nextDate != null) {
+                        val updatedTask = task.copy(
+                            dueDateTime = nextDate,
+                            status = TaskStatus.PENDING // Yeni tarih için tekrar PENDING
+                        )
+                        repository.update(updatedTask)
+                        // Yeni tarih için alarm planla
+                        ReminderScheduler.scheduleReminder(getApplication<Application>(), updatedTask)
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

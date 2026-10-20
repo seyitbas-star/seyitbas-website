@@ -73,6 +73,16 @@ import com.example.mindme.data.notification.TaskReminderWorker
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.TimeInput
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.example.mindme.data.RepeatType
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.foundation.layout.size
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -210,8 +220,8 @@ fun MindMeScreen(
     if (showAddDialog) {
         AddTaskDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { title, dateTime ->
-                viewModel.addTask(title, dateTime)
+            onAdd = { title, dateTime, repeatType ->
+                viewModel.addTask(title, dateTime, repeatType)
                 showAddDialog = false
             }
         )
@@ -268,14 +278,38 @@ fun TaskRow(
                 Text(text = statusIcon, fontSize = 24.sp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = task.title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        textDecoration = if (task.status == TaskStatus.COMPLETED)
-                            TextDecoration.LineThrough else TextDecoration.None,
-                        color = statusColor
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = task.title,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            textDecoration = if (task.status == TaskStatus.COMPLETED)
+                                TextDecoration.LineThrough else TextDecoration.None,
+                            color = statusColor
+                        )
+                        // Tekrarlayan görevse ikon göster
+                        if (task.repeatType != RepeatType.NONE) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = when (task.repeatType) {
+                                        RepeatType.DAILY -> "Günlük"
+                                        RepeatType.WEEKLY -> "Haftalık"
+                                        RepeatType.MONTHLY -> "Aylık"
+                                        RepeatType.YEARLY -> "Yıllık"
+
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -441,7 +475,7 @@ fun TaskRow(
 @OptIn(ExperimentalMaterial3Api::class)
 fun AddTaskDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, LocalDateTime) -> Unit
+    onAdd: (String, LocalDateTime, RepeatType) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var selectedDateTime by remember {
@@ -449,6 +483,7 @@ fun AddTaskDialog(
     }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var selectedRepeat by remember { mutableStateOf(RepeatType.NONE) }
 
     val dateFormatter = DateTimeFormatter.ofPattern(
         "dd MMM yyyy, HH:mm",
@@ -564,13 +599,60 @@ fun AddTaskDialog(
                         Text("🕐 Saat Seç")
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Tekrar:",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    RepeatType.values().filter { it != RepeatType.NONE }.forEach { type ->
+                        val isSelected = selectedRepeat == type
+
+                        // Kendi FilterChip'imizi Surface ile çiziyoruz
+                        Surface(
+                            selected = isSelected,
+                            onClick = {
+                                selectedRepeat = if (isSelected) RepeatType.NONE else type
+                            },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 8.dp), // İç boşluk sadece dikeyde
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when (type) {
+                                        RepeatType.DAILY -> "Günlük"
+                                        RepeatType.WEEKLY -> "Haftalık"
+                                        RepeatType.MONTHLY -> "Aylık"
+                                        RepeatType.YEARLY -> "Yıllık"
+                                        else -> ""
+                                    },
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
+
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onAdd(title.trim(), selectedDateTime)
+                        onAdd(title.trim(), selectedDateTime, selectedRepeat)
                     }
                 }
             ) {

@@ -11,5 +11,6 @@ data class Task(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
     val dueDateTime: LocalDateTime,
-    val status: TaskStatus = TaskStatus.PENDING
+    val status: TaskStatus = TaskStatus.PENDING,
+    val repeatType: RepeatType = RepeatType.NONE
 )

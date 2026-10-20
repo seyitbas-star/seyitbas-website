@@ -5,3 +5,10 @@ enum class TaskStatus {
     COMPLETED,
     MISSED
 }
+enum class RepeatType {
+    NONE,       // Tek seferlik
+    DAILY,      // Her gün
+    WEEKLY,     // Her hafta
+    MONTHLY,    // Her ay
+    YEARLY      // Her yıl (doğum günü)
+}
