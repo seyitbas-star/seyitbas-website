@@ -1,87 +1,77 @@
 package com.example.mindme
 
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.IconButton
+// Added missing imports for Column, Spacer, height, dp, sp, and FontWeight
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-// Added missing imports for Column, Spacer, height, dp, sp, and FontWeight
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.mindme.ui.theme.MindMeTheme
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import com.example.mindme.data.Task
-import java.time.LocalDateTime
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.text.style.TextDecoration
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material.icons.filled.Create
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
-import java.time.Instant
-import java.time.ZoneId
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mindme.data.RepeatType
+import com.example.mindme.data.Task
 import com.example.mindme.data.TaskStatus
 import com.example.mindme.data.notification.NotificationHelper
-import com.example.mindme.data.notification.TaskReminderWorker
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.FilterChip
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import com.example.mindme.data.RepeatType
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.Surface
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.foundation.layout.size
+import com.example.mindme.ui.theme.MindMeTheme
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -220,8 +210,8 @@ fun MindMeScreen(
     if (showAddDialog) {
         AddTaskDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { title, dateTime, repeatType ->
-                viewModel.addTask(title, dateTime, repeatType)
+            onAdd = { title, dateTime, repeatType, reminder ->   // ← 4 parametre (reminder eklendi)
+                viewModel.addTask(title, dateTime, repeatType, reminder)
                 showAddDialog = false
             }
         )
@@ -475,12 +465,14 @@ fun TaskRow(
 @OptIn(ExperimentalMaterial3Api::class)
 fun AddTaskDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, LocalDateTime, RepeatType) -> Unit
+    onAdd: (String, LocalDateTime, RepeatType, Int) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var selectedDateTime by remember {
         mutableStateOf(LocalDateTime.now().plusHours(1))
     }
+    var selectedReminder by remember { mutableStateOf(2) } // Varsayılan 2 dk
+    var expandedDropdown by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedRepeat by remember { mutableStateOf(RepeatType.NONE) }
@@ -577,6 +569,7 @@ fun AddTaskDialog(
         title = { Text("Yeni Görev") },
         text = {
             Column {
+                // 1. Görev Başlığı
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -584,13 +577,18 @@ fun AddTaskDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 2. Zaman Bilgisi ve Seçiciler
                 Text(
                     text = "Zaman: ${selectedDateTime.format(dateFormatter)}",
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { showDatePicker = true }) {
                         Text("📅 Tarih Seç")
@@ -599,7 +597,10 @@ fun AddTaskDialog(
                         Text("🕐 Saat Seç")
                     }
                 }
+
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // 3. Tekrar Seçici
                 Text(
                     text = "Tekrar:",
                     fontSize = 14.sp,
@@ -610,23 +611,19 @@ fun AddTaskDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     RepeatType.values().filter { it != RepeatType.NONE }.forEach { type ->
                         val isSelected = selectedRepeat == type
-
-                        // Kendi FilterChip'imizi Surface ile çiziyoruz
                         Surface(
                             selected = isSelected,
-                            onClick = {
-                                selectedRepeat = if (isSelected) RepeatType.NONE else type
-                            },
+                            onClick = { selectedRepeat = if (isSelected) RepeatType.NONE else type },
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                             color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.weight(1f)
                         ) {
                             Box(
-                                modifier = Modifier.padding(vertical = 8.dp), // İç boşluk sadece dikeyde
+                                modifier = Modifier.padding(vertical = 8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -645,14 +642,74 @@ fun AddTaskDialog(
                         }
                     }
                 }
-            }
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 4. Hatırlatma Zamanı Dropdown
+                Text(
+                    text = "Hatırlatma Zamanı:",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Dropdown Alanı
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { expandedDropdown = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = when (selectedReminder) {
+                                0 -> "Görev saatinde"
+                                15 -> "15 dakika önce"
+                                30 -> "30 dakika önce"
+                                45 -> "45 dakika önce"
+                                60 -> "1 saat önce"
+                                120 -> "2 saat önce"
+                                else -> "$selectedReminder dakika önce"
+                            }
+                        )
+                    }
+
+                    // Menüyü aşağı doğru açmaya zorluyoruz
+                    DropdownMenu(
+                        expanded = expandedDropdown,
+                        onDismissRequest = { expandedDropdown = false },
+                        modifier = Modifier.offset(y = 40.dp) // Import'u unutma!
+                    ) {
+                        val options = listOf(0, 15, 30, 45, 60, 120)
+                        options.forEach { minutes ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        when (minutes) {
+                                            0 -> "Görev saatinde"
+                                            15 -> "15 dakika önce"
+                                            30 -> "30 dakika önce"
+                                            45 -> "45 dakika önce"
+                                            60 -> "1 saat önce"
+                                            120 -> "2 saat önce"
+                                            else -> "$minutes dakika önce"
+                                        }
+                                    )
+                                },
+                                onClick = {
+                                    selectedReminder = minutes
+                                    expandedDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onAdd(title.trim(), selectedDateTime, selectedRepeat)
+                        onAdd(title.trim(), selectedDateTime, selectedRepeat, selectedReminder)
                     }
                 }
             ) {

@@ -40,13 +40,18 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    fun addTask(title: String, dueDateTime: LocalDateTime, repeatType: RepeatType = RepeatType.NONE) {
+    fun addTask(title: String,
+                dueDateTime: LocalDateTime,
+                repeatType: RepeatType = RepeatType.NONE,
+                reminderMinutesBefore: Int = 2
+                ) {
         viewModelScope.launch {
             try {
                 val newTask = Task(
                     title = title,
                     dueDateTime = dueDateTime,
-                    repeatType = repeatType   // ← YENİ
+                    repeatType = repeatType,
+                    reminderMinutesBefore = reminderMinutesBefore
                 )
                 repository.insert(newTask)
                 ReminderScheduler.scheduleReminder(getApplication<Application>(), newTask)

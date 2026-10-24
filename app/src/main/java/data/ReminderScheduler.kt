@@ -15,14 +15,17 @@ import com.example.mindme.data.RepeatType
 object ReminderScheduler {
 
     private const val TAG = "MindMe"
-    private const val MINUTES_BEFORE = 3L
+
 
     fun scheduleReminder(context: Context, task: Task) {
         try {
-            val triggerTime = task.dueDateTime.minusMinutes(MINUTES_BEFORE)
+            // Kullanıcının seçtiği dakikayı al (Varsayılan 2 ise onu kullan)
+            val minutesBefore = task.reminderMinutesBefore.toLong()
+
+            // Eğer "Görev saatinde" (0) seçildiyse, tam saatinde uyarsın
+            val triggerTime = task.dueDateTime.minusMinutes(minutesBefore)
             val now = LocalDateTime.now()
 
-            // Görev zamanı geçmişse planlama yapma
             if (triggerTime.isBefore(now)) {
                 Log.d(TAG, "⏭️ Alarm planlanmadı (geçmiş): ${task.title}")
                 return
@@ -35,9 +38,8 @@ object ReminderScheduler {
                 return
             }
 
-            Log.d(TAG, "⏰ Alarm planlanıyor: ${task.title} - ${delaySeconds} saniye sonra")
+            Log.d(TAG, "⏰ Alarm planlanıyor: ${task.title} - ${delaySeconds} saniye sonra ($minutesBefore dk önce)")
 
-            // Görev ID'sini input data olarak gönder
             val inputData = Data.Builder()
                 .putString("TASK_ID", task.id)
                 .build()
@@ -47,7 +49,6 @@ object ReminderScheduler {
                 .setInputData(inputData)
                 .build()
 
-            // Her görev için benzersiz iş adı: "task_<uuid>"
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(
                     "task_${task.id}",

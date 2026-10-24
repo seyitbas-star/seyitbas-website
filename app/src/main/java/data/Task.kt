@@ -12,5 +12,6 @@ data class Task(
     val title: String,
     val dueDateTime: LocalDateTime,
     val status: TaskStatus = TaskStatus.PENDING,
-    val repeatType: RepeatType = RepeatType.NONE
+    val repeatType: RepeatType = RepeatType.NONE,
+    val reminderMinutesBefore: Int = 2   // ← YENİ (Varsayılan 2 dk)
 )
