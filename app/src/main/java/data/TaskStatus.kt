@@ -12,3 +12,9 @@ enum class RepeatType {
     MONTHLY,    // Her ay
     YEARLY      // Her yıl (doğum günü)
 }
+enum class Category(val displayName: String) {
+    NONE("Genel"),
+    WORK("İş"),
+    PERSONAL("Kişisel"),
+    SHOPPING("Alışveriş")
+}

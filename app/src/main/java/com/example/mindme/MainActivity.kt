@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mindme.data.Category
 import com.example.mindme.data.RepeatType
 import com.example.mindme.data.Task
 import com.example.mindme.data.TaskStatus
@@ -278,8 +279,8 @@ fun MindMeScreen(
     if (showAddDialog) {
         AddTaskDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { title, dateTime, repeatType, reminder ->
-                viewModel.addTask(title, dateTime, repeatType, reminder)
+            onAdd = { title, dateTime, repeatType, reminder, category ->
+                viewModel.addTask(title, dateTime, repeatType, reminder, category)
                 showAddDialog = false
             }
         )
@@ -350,6 +351,27 @@ fun TaskRow(
                                 TextDecoration.LineThrough else TextDecoration.None,
                             color = statusColor
                         )
+                        // Kategori Etiketi
+                        if (task.category != Category.NONE) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = when(task.category) {
+                                    Category.WORK -> Color(0xFFE3F2FD)
+                                    Category.PERSONAL -> Color(0xFFE8F5E9)
+                                    Category.SHOPPING -> Color(0xFFFFF3E0)
+                                    else -> Color.Transparent
+                                },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = task.category.displayName,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    color = Color.Black
+                                )
+                            }
+                        }
                         if (task.repeatType != RepeatType.NONE) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
@@ -531,8 +553,9 @@ fun TaskRow(
 @OptIn(ExperimentalMaterial3Api::class)
 fun AddTaskDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, LocalDateTime, RepeatType, Int) -> Unit
+    onAdd: (String, LocalDateTime, RepeatType, Int, Category) -> Unit
 ) {
+    var selectedCategory by remember { mutableStateOf(Category.NONE) }
     var title by remember { mutableStateOf("") }
     var selectedDateTime by remember { mutableStateOf(LocalDateTime.now().plusHours(1)) }
     var selectedReminder by remember { mutableStateOf(2) }
@@ -631,6 +654,40 @@ fun AddTaskDialog(
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
+                Text(text = "Kategori:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(Category.WORK, Category.PERSONAL, Category.SHOPPING).forEach { cat ->
+                        val isSelected = selectedCategory == cat
+                        Surface(
+                            selected = isSelected,
+                            onClick = { selectedCategory = if (isSelected) Category.NONE else cat },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            color = when(cat) {
+                                Category.WORK -> if (isSelected) Color(0xFF1976D2) else Color(0xFFE3F2FD)
+                                Category.PERSONAL -> if (isSelected) Color(0xFF388E3C) else Color(0xFFE8F5E9)
+                                Category.SHOPPING -> if (isSelected) Color(0xFFF57C00) else Color(0xFFFFF3E0)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(modifier = Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = cat.displayName,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) Color.White else Color.Black
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Text(text = "Hatırlatma Zamanı:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -678,7 +735,7 @@ fun AddTaskDialog(
             TextButton(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onAdd(title.trim(), selectedDateTime, selectedRepeat, selectedReminder)
+                        onAdd(title.trim(), selectedDateTime, selectedRepeat, selectedReminder, selectedCategory)
                     }
                 }
             ) { Text("Ekle") }

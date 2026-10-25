@@ -32,4 +32,13 @@ class Converters {
     fun repeatTypeToString(repeatType: RepeatType?): String? {
         return repeatType?.name
     }
+    @TypeConverter
+    fun fromCategory(value: String?): Category? {
+        return value?.let { Category.valueOf(it) }
+    }
+
+    @TypeConverter
+    fun categoryToString(category: Category?): String? {
+        return category?.name
+    }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mindme.data.AppDatabase
+import com.example.mindme.data.Category
 import com.example.mindme.data.RepeatType
 import com.example.mindme.data.Task
 import com.example.mindme.data.TaskLog
@@ -45,7 +46,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     fun addTask(title: String,
                 dueDateTime: LocalDateTime,
                 repeatType: RepeatType = RepeatType.NONE,
-                reminderMinutesBefore: Int = 2
+                reminderMinutesBefore: Int = 2,
+                category: Category = Category.NONE // ← YENİ
                 ) {
         viewModelScope.launch {
             try {
@@ -53,7 +55,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                     title = title,
                     dueDateTime = dueDateTime,
                     repeatType = repeatType,
-                    reminderMinutesBefore = reminderMinutesBefore
+                    reminderMinutesBefore = reminderMinutesBefore,
+                    category = category // ← YENİ
                 )
                 repository.insert(newTask)
                 ReminderScheduler.scheduleReminder(getApplication<Application>(), newTask)
