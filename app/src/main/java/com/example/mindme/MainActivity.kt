@@ -119,7 +119,7 @@ fun MindMeScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
-
+    var logFilter by remember { mutableStateOf(0) }
     val filteredTasks = if (searchQuery.isBlank()) {
         tasks
     } else {
@@ -190,11 +190,51 @@ fun MindMeScreen(
                 }
             } else {
                 // === GEÇMİŞ (LOG) SEKMESİ ===
-                if (logs.isEmpty()) {
-                    Text("Henüz bir işlem geçmişi yok.", color = Color.Gray)
+
+                // 1. Filtre Butonları (Tümü / Yapılanlar / Yapılamayanlar)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val filters = listOf("Tümü", "Yapılanlar", "Yapılamayanlar")
+                    filters.forEachIndexed { index, title ->
+                        val isSelected = logFilter == index
+                        Surface(
+                            selected = isSelected,
+                            onClick = { logFilter = index },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = title,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Filtrelenmiş Log Listesi
+                val filteredLogs = when (logFilter) {
+                    1 -> logs.filter { it.status == TaskStatus.COMPLETED }
+                    2 -> logs.filter { it.status == TaskStatus.MISSED }
+                    else -> logs
+                }
+
+                if (filteredLogs.isEmpty()) {
+                    Text("Bu filtreye uygun bir işlem geçmişi yok.", color = Color.Gray)
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(logs, key = { it.id }) { log ->
+                        items(filteredLogs, key = { it.id }) { log ->
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier.padding(12.dp).fillMaxWidth(),
