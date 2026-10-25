@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindme.data.RepeatType
@@ -79,8 +81,18 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // YENİ: Splash Screen API'sini başlat (super.onCreate'ten ÖNCE olmalı)
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // YENİ: Splash ekranını 1 saniye (1000ms) boyunca ekranda tut
+        var isReady = false
+        splashScreen.setKeepOnScreenCondition { !isReady }
+
+        android.os.Handler(mainLooper).postDelayed({
+            isReady = true
+        }, 1000) // 1000 milisaniye = 1 saniye
 
         NotificationHelper.createNotificationChannel(this)
         requestNotificationPermission()
@@ -183,7 +195,8 @@ fun MindMeScreen(
                                 onReschedule = { t, newDateTime -> viewModel.markAsPending(t, newDateTime) },
                                 onDelete = { viewModel.deleteTask(it) },
                                 onDateChange = { t, newDate -> viewModel.updateTaskDate(t, newDate) },
-                                onTimeChange = { t, h, m -> viewModel.updateTaskTime(t, h, m) }
+                                onTimeChange = { t, h, m -> viewModel.updateTaskTime(t, h, m) },
+                                onEditTitle = { t, newTitle -> viewModel.updateTaskTitle(t, newTitle) } // ← YENİ
                             )
                         }
                     }
@@ -282,11 +295,13 @@ fun TaskRow(
     onReschedule: (Task, LocalDateTime) -> Unit = { _, _ -> },
     onDelete: (Task) -> Unit = {},
     onDateChange: (Task, java.time.LocalDate) -> Unit = { _, _ -> },
-    onTimeChange: (Task, Int, Int) -> Unit = { _, _, _ -> }
+    onTimeChange: (Task, Int, Int) -> Unit = { _, _, _ -> },
+    onEditTitle: (Task, String) -> Unit = { _, _ -> } // ← YENİ
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
 
     val statusIcon = when (task.status) {
         TaskStatus.PENDING -> "⬜"
@@ -300,7 +315,12 @@ fun TaskRow(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { /* Normal tıklama yapılırsa bir şey yapma (veya detay aç) */ },
+                onLongClick = { showEditDialog = true } // ← Uzun basınca çalışır
+            ),
         colors = CardDefaults.cardColors(
             containerColor = when (task.status) {
                 TaskStatus.MISSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
@@ -471,6 +491,39 @@ fun TaskRow(
             },
             dismissButton = { TextButton(onClick = { showReschedulePicker = false }) { Text("İptal") } }
         ) { DatePicker(state = datePickerState) }
+    }
+    // ✏️ Başlık Düzenleme Dialog
+    if (showEditDialog) {
+        var editTitle by remember { mutableStateOf(task.title) }
+
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Görevi Düzenle") },
+            text = {
+                OutlinedTextField(
+                    value = editTitle,
+                    onValueChange = { editTitle = it },
+                    label = { Text("Görev başlığı") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (editTitle.isNotBlank()) {
+                        onEditTitle(task, editTitle)
+                        showEditDialog = false
+                    }
+                }) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
     }
 }
 

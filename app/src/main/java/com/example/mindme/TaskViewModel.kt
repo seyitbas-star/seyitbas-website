@@ -72,7 +72,16 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
+    fun updateTaskTitle(task: Task, newTitle: String) {
+        if (newTitle.isBlank()) return // Boş başlığa izin verme
+        viewModelScope.launch {
+            try {
+                repository.update(task.copy(title = newTitle.trim()))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
     fun deleteTask(task: Task) {
         viewModelScope.launch {
             try {
