@@ -1,6 +1,5 @@
 package com.example.mindme
 
-// Added missing imports for Column, Spacer, height, dp, sp, and FontWeight
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,12 +19,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +39,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -55,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -78,13 +82,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        android.util.Log.d("MindMe", "🚀 onCreate başladı")
-
         NotificationHelper.createNotificationChannel(this)
-        android.util.Log.d("MindMe", "✅ Bildirim kanalı oluşturuldu")
-
-         android.util.Log.d("MindMe", "✅ Worker planlandı")
-
         requestNotificationPermission()
 
         setContent {
@@ -111,15 +109,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Added optional modifier parameter to allow applying padding from Scaffold/parent
 @Composable
 fun MindMeScreen(
     modifier: Modifier = Modifier,
     viewModel: TaskViewModel = viewModel()
 ) {
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val logs by viewModel.logs.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
+
     val filteredTasks = if (searchQuery.isBlank()) {
         tasks
     } else {
@@ -128,79 +128,94 @@ fun MindMeScreen(
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Create, contentDescription = "Görev Ekle")
+            if (selectedTab == 0) {
+                FloatingActionButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Default.Create, contentDescription = "Görev Ekle")
+                }
+            }
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = { Icon(Icons.Default.List, contentDescription = "Görevler") },
+                    label = { Text("Görevler") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Geçmiş") },
+                    label = { Text("Geçmiş") }
+                )
             }
         }
     ) { innerPadding ->
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(innerPadding) // Alt menünün içeriği kapatmasını engeller
                 .padding(16.dp)
         ) {
-            Text(
-                text = "MindMe",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Let me remind you",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontStyle = FontStyle.Italic,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Görevlerde ara...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Ara"
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Temizle"
+            Text("MindMe", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            Text("Let me remind you", fontSize = 14.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (selectedTab == 0) {
+                // === GÖREVLER SEKMESİ ===
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Görevlerde ara...") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (filteredTasks.isEmpty()) {
+                    Text("Görev bulunamadı.", color = Color.Gray)
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(filteredTasks, key = { it.id }) { task ->
+                            TaskRow(
+                                task = task,
+                                onMarkCompleted = { viewModel.markAsCompleted(it) },
+                                onMarkMissed = { viewModel.markAsMissed(it) },
+                                onReschedule = { t, newDateTime -> viewModel.markAsPending(t, newDateTime) },
+                                onDelete = { viewModel.deleteTask(it) },
+                                onDateChange = { t, newDate -> viewModel.updateTaskDate(t, newDate) },
+                                onTimeChange = { t, h, m -> viewModel.updateTaskTime(t, h, m) }
                             )
                         }
                     }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            if (filteredTasks.isEmpty()) {
-                Text(
-                    text = if (searchQuery.isBlank()) {
-                        "Henüz görev yok. + butonuna basarak ekle."
-                    } else {
-                        "\"$searchQuery\" ile eşleşen görev bulunamadı."
-                    },
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(filteredTasks, key = { it.id }) { task ->
-                        TaskRow(
-                            task = task,
-                            onMarkCompleted = { viewModel.markAsCompleted(it) },
-                            onMarkMissed = { viewModel.markAsMissed(it) },
-                            onReschedule = { t, newDateTime -> viewModel.markAsPending(t, newDateTime) },
-                            onDelete = { viewModel.deleteTask(it) },
-                            onDateChange = { t, newDate -> viewModel.updateTaskDate(t, newDate) },
-                            onTimeChange = { t, h, m -> viewModel.updateTaskTime(t, h, m) }
-                        )
+                // === GEÇMİŞ (LOG) SEKMESİ ===
+                if (logs.isEmpty()) {
+                    Text("Henüz bir işlem geçmişi yok.", color = Color.Gray)
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(logs, key = { it.id }) { log ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(log.taskTitle, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = log.actionDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.forLanguageTag("tr-TR"))),
+                                            fontSize = 12.sp, color = Color.Gray
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = if (log.status == TaskStatus.COMPLETED) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                                        contentDescription = null,
+                                        tint = if (log.status == TaskStatus.COMPLETED) Color(0xFF4CAF50) else Color.Red
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -210,7 +225,7 @@ fun MindMeScreen(
     if (showAddDialog) {
         AddTaskDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { title, dateTime, repeatType, reminder ->   // ← 4 parametre (reminder eklendi)
+            onAdd = { title, dateTime, repeatType, reminder ->
                 viewModel.addTask(title, dateTime, repeatType, reminder)
                 showAddDialog = false
             }
@@ -233,7 +248,6 @@ fun TaskRow(
     var showTimePicker by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
 
-    // Duruma göre ikon ve renk
     val statusIcon = when (task.status) {
         TaskStatus.PENDING -> "⬜"
         TaskStatus.COMPLETED -> "✅"
@@ -260,7 +274,6 @@ fun TaskRow(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Üst: ikon + başlık + tarih/saat
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -277,7 +290,6 @@ fun TaskRow(
                                 TextDecoration.LineThrough else TextDecoration.None,
                             color = statusColor
                         )
-                        // Tekrarlayan görevse ikon göster
                         if (task.repeatType != RepeatType.NONE) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
@@ -290,7 +302,7 @@ fun TaskRow(
                                         RepeatType.WEEKLY -> "Haftalık"
                                         RepeatType.MONTHLY -> "Aylık"
                                         RepeatType.YEARLY -> "Yıllık"
-
+                                        else -> ""
                                     },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -325,7 +337,6 @@ fun TaskRow(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Alt: aksiyon butonları
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -359,104 +370,66 @@ fun TaskRow(
         }
     }
 
-    // 📅 Tarih Değiştirme Dialog
+    // (Tarih, Saat ve Yeniden Planlama Dialogları - Aynı kalacak)
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = task.dueDateTime
-                .atZone(java.time.ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
+            initialSelectedDateMillis = task.dueDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val picked = java.time.Instant.ofEpochMilli(millis)
-                            .atZone(java.time.ZoneId.systemDefault())
-                            .toLocalDate()
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
                         onDateChange(task, picked)
                     }
                     showDatePicker = false
                 }) { Text("Tamam") }
             },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("İptal") }
-            }
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("İptal") } }
         ) { DatePicker(state = datePickerState) }
     }
 
-    // 🕐 Saat Değiştirme Dialog
     if (showTimePicker) {
         var isInputMode by remember { mutableStateOf(false) }
-
         val timePickerState = rememberTimePickerState(
             initialHour = task.dueDateTime.hour,
             initialMinute = task.dueDateTime.minute,
             is24Hour = true
         )
-
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Saat Seç")
                     IconButton(onClick = { isInputMode = !isInputMode }) {
-                        Icon(
-                            imageVector = if (isInputMode) Icons.Default.Schedule else Icons.Default.Edit,
-                            contentDescription = if (isInputMode) "Kadrana geç" else "Klavyeye geç"
-                        )
+                        Icon(imageVector = if (isInputMode) Icons.Default.Schedule else Icons.Default.Edit, contentDescription = null)
                     }
                 }
             },
-            text = {
-                if (isInputMode) {
-                    TimeInput(state = timePickerState)
-                } else {
-                    TimePicker(state = timePickerState)
-                }
-            },
+            text = { if (isInputMode) TimeInput(state = timePickerState) else TimePicker(state = timePickerState) },
             confirmButton = {
-                TextButton(onClick = {
-                    onTimeChange(task, timePickerState.hour, timePickerState.minute)
-                    showTimePicker = false
-                }) { Text("Tamam") }
+                TextButton(onClick = { onTimeChange(task, timePickerState.hour, timePickerState.minute); showTimePicker = false }) { Text("Tamam") }
             },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("İptal") }
-            }
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("İptal") } }
         )
     }
 
-    // 🔄 Yeniden Planlama Dialog
     if (showReschedulePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = System.currentTimeMillis()
-        )
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
         DatePickerDialog(
             onDismissRequest = { showReschedulePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val picked = java.time.Instant.ofEpochMilli(millis)
-                            .atZone(java.time.ZoneId.systemDefault())
-                            .toLocalDate()
-                        val newDateTime = task.dueDateTime
-                            .withYear(picked.year)
-                            .withMonth(picked.monthValue)
-                            .withDayOfMonth(picked.dayOfMonth)
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        val newDateTime = task.dueDateTime.withYear(picked.year).withMonth(picked.monthValue).withDayOfMonth(picked.dayOfMonth)
                         onReschedule(task, newDateTime)
                     }
                     showReschedulePicker = false
                 }) { Text("Tamam") }
             },
-            dismissButton = {
-                TextButton(onClick = { showReschedulePicker = false }) { Text("İptal") }
-            }
+            dismissButton = { TextButton(onClick = { showReschedulePicker = false }) { Text("İptal") } }
         ) { DatePicker(state = datePickerState) }
     }
 }
@@ -468,108 +441,58 @@ fun AddTaskDialog(
     onAdd: (String, LocalDateTime, RepeatType, Int) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
-    var selectedDateTime by remember {
-        mutableStateOf(LocalDateTime.now().plusHours(1))
-    }
-    var selectedReminder by remember { mutableStateOf(2) } // Varsayılan 2 dk
+    var selectedDateTime by remember { mutableStateOf(LocalDateTime.now().plusHours(1)) }
+    var selectedReminder by remember { mutableStateOf(2) }
     var expandedDropdown by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedRepeat by remember { mutableStateOf(RepeatType.NONE) }
 
-    val dateFormatter = DateTimeFormatter.ofPattern(
-        "dd MMM yyyy, HH:mm",
-        Locale.forLanguageTag("tr-TR")
-    )
+    val dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.forLanguageTag("tr-TR"))
 
-    // 📅 Tarih Seçici Dialog
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = System.currentTimeMillis()
-        )
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val picked = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDate()
-                        selectedDateTime = selectedDateTime
-                            .withYear(picked.year)
-                            .withMonth(picked.monthValue)
-                            .withDayOfMonth(picked.dayOfMonth)
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        selectedDateTime = selectedDateTime.withYear(picked.year).withMonth(picked.monthValue).withDayOfMonth(picked.dayOfMonth)
                     }
                     showDatePicker = false
-                }) {
-                    Text("Tamam")
-                }
+                }) { Text("Tamam") }
             },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("İptal")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("İptal") } }
+        ) { DatePicker(state = datePickerState) }
     }
 
-    // 🕐 Saat Seçici Dialog
     if (showTimePicker) {
         var isInputMode by remember { mutableStateOf(false) }
-
-        val timePickerState = rememberTimePickerState(
-            initialHour = selectedDateTime.hour,
-            initialMinute = selectedDateTime.minute,
-            is24Hour = true
-        )
-
+        val timePickerState = rememberTimePickerState(initialHour = selectedDateTime.hour, initialMinute = selectedDateTime.minute, is24Hour = true)
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Saat Seç")
                     IconButton(onClick = { isInputMode = !isInputMode }) {
-                        Icon(
-                            imageVector = if (isInputMode) Icons.Default.Schedule else Icons.Default.Edit,
-                            contentDescription = if (isInputMode) "Kadrana geç" else "Klavyeye geç"
-                        )
+                        Icon(imageVector = if (isInputMode) Icons.Default.Schedule else Icons.Default.Edit, contentDescription = null)
                     }
                 }
             },
-            text = {
-                if (isInputMode) {
-                    TimeInput(state = timePickerState)
-                } else {
-                    TimePicker(state = timePickerState)
-                }
-            },
+            text = { if (isInputMode) TimeInput(state = timePickerState) else TimePicker(state = timePickerState) },
             confirmButton = {
-                TextButton(onClick = {
-                    selectedDateTime = selectedDateTime
-                        .withHour(timePickerState.hour)
-                        .withMinute(timePickerState.minute)
-                    showTimePicker = false
-                }) { Text("Tamam") }
+                TextButton(onClick = { selectedDateTime = selectedDateTime.withHour(timePickerState.hour).withMinute(timePickerState.minute); showTimePicker = false }) { Text("Tamam") }
             },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("İptal") }
-            }
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("İptal") } }
         )
     }
 
-    // 📝 Ana Dialog
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Yeni Görev") },
         text = {
             Column {
-                // 1. Görev Başlığı
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -577,42 +500,17 @@ fun AddTaskDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // 2. Zaman Bilgisi ve Seçiciler
-                Text(
-                    text = "Zaman: ${selectedDateTime.format(dateFormatter)}",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+                Text(text = "Zaman: ${selectedDateTime.format(dateFormatter)}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { showDatePicker = true }) {
-                        Text("📅 Tarih Seç")
-                    }
-                    TextButton(onClick = { showTimePicker = true }) {
-                        Text("🕐 Saat Seç")
-                    }
+                    TextButton(onClick = { showDatePicker = true }) { Text("📅 Tarih Seç") }
+                    TextButton(onClick = { showTimePicker = true }) { Text("🕐 Saat Seç") }
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // 3. Tekrar Seçici
-                Text(
-                    text = "Tekrar:",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+                Text(text = "Tekrar:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     RepeatType.values().filter { it != RepeatType.NONE }.forEach { type ->
                         val isSelected = selectedRepeat == type
                         Surface(
@@ -622,10 +520,7 @@ fun AddTaskDialog(
                             color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Box(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(modifier = Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                                 Text(
                                     text = when (type) {
                                         RepeatType.DAILY -> "Günlük"
@@ -642,24 +537,11 @@ fun AddTaskDialog(
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // 4. Hatırlatma Zamanı Dropdown
-                Text(
-                    text = "Hatırlatma Zamanı:",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+                Text(text = "Hatırlatma Zamanı:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-
-                // Dropdown Alanı
                 Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { expandedDropdown = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    OutlinedButton(onClick = { expandedDropdown = true }, modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = when (selectedReminder) {
                                 0 -> "Görev saatinde"
@@ -672,15 +554,12 @@ fun AddTaskDialog(
                             }
                         )
                     }
-
-                    // Menüyü aşağı doğru açmaya zorluyoruz
                     DropdownMenu(
                         expanded = expandedDropdown,
                         onDismissRequest = { expandedDropdown = false },
-                        modifier = Modifier.offset(y = 40.dp) // Import'u unutma!
+                        modifier = Modifier.offset(y = 40.dp)
                     ) {
-                        val options = listOf(0, 15, 30, 45, 60, 120)
-                        options.forEach { minutes ->
+                        listOf(0, 15, 30, 45, 60, 120).forEach { minutes ->
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -695,10 +574,7 @@ fun AddTaskDialog(
                                         }
                                     )
                                 },
-                                onClick = {
-                                    selectedReminder = minutes
-                                    expandedDropdown = false
-                                }
+                                onClick = { selectedReminder = minutes; expandedDropdown = false }
                             )
                         }
                     }
@@ -712,14 +588,8 @@ fun AddTaskDialog(
                         onAdd(title.trim(), selectedDateTime, selectedRepeat, selectedReminder)
                     }
                 }
-            ) {
-                Text("Ekle")
-            }
+            ) { Text("Ekle") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("İptal")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("İptal") } }
     )
 }

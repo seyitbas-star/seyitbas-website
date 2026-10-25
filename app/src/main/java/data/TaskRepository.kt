@@ -2,7 +2,9 @@ package com.example.mindme.data
 
 import kotlinx.coroutines.flow.Flow
 
-class TaskRepository(private val taskDao: TaskDao) {
+class TaskRepository(
+    private val taskDao: TaskDao,
+    private val taskLogDao: TaskLogDao) {
 
     val allTasks: Flow<List<Task>> = taskDao.getAllTasks()
 
@@ -20,5 +22,10 @@ class TaskRepository(private val taskDao: TaskDao) {
     suspend fun markOverdueTasksAsMissed() {
         val now = java.time.LocalDateTime.now().toString()
         taskDao.markOverdueAsMissed(now)
+    }
+    val allLogs: Flow<List<TaskLog>> = taskLogDao.getAllLogs()
+
+    suspend fun insertLog(log: TaskLog) {
+        taskLogDao.insertLog(log)
     }
 }

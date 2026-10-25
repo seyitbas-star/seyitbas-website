@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mindme.data.AppDatabase
+import com.example.mindme.data.RepeatType
 import com.example.mindme.data.Task
+import com.example.mindme.data.TaskLog
 import com.example.mindme.data.TaskRepository
 import com.example.mindme.data.TaskStatus
 import com.example.mindme.data.notification.ReminderScheduler
@@ -13,15 +15,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
-import com.example.mindme.data.RepeatType
 
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: TaskRepository
 
     init {
-        val dao = AppDatabase.getDatabase(application).taskDao()
-        repository = TaskRepository(dao)
+        val db = AppDatabase.getDatabase(application)
+        // Repository'ye iki DAO'yu da veriyoruz
+        repository = TaskRepository(db.taskDao(), db.taskLogDao())
 
         // Uygulama açılışında zamanı geçen görevleri işaretle
         viewModelScope.launch {
@@ -81,7 +83,12 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
+    val logs: StateFlow<List<TaskLog>> = repository.allLogs
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
     fun markAsCompleted(task: Task) {
         viewModelScope.launch {
             try {
@@ -89,6 +96,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                     // Tek seferlik görev: Tamamlandı yap, alarmı iptal et
                     repository.update(task.copy(status = TaskStatus.COMPLETED))
                     ReminderScheduler.cancelReminder(getApplication<Application>(), task)
+                    repository.insertLog(TaskLog(taskTitle = task.title, status = TaskStatus.COMPLETED))
                 } else {
                     // Tekrarlayan görev: Bir sonraki tarihi hesapla
                     val nextDate = ReminderScheduler.getNextOccurrence(task.dueDateTime, task.repeatType)
@@ -100,11 +108,10 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                         repository.update(updatedTask)
                         // Yeni tarih için alarm planla
                         ReminderScheduler.scheduleReminder(getApplication<Application>(), updatedTask)
+                        repository.insertLog(TaskLog(taskTitle = task.title, status = TaskStatus.COMPLETED))
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace()}
         }
     }
 
@@ -113,9 +120,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 repository.update(task.copy(status = TaskStatus.MISSED))
                 ReminderScheduler.cancelReminder(getApplication<Application>(), task)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+                repository.insertLog(TaskLog(taskTitle = task.title, status = TaskStatus.MISSED))
+            } catch (e: Exception) { e.printStackTrace()}
         }
     }
 
@@ -165,9 +171,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 repository.update(updatedTask)
                 ReminderScheduler.scheduleReminder(getApplication<Application>(), updatedTask)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace()}
         }
     }
 }
