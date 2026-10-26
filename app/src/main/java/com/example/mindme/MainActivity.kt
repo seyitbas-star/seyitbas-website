@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
         }, 1000) // 1000 milisaniye = 1 saniye
 
         NotificationHelper.createNotificationChannel(this)
+        scheduleDailySummaries(this)
         requestNotificationPermission()
 
         setContent {
@@ -119,6 +120,50 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+    private fun scheduleDailySummaries(context: android.content.Context) {
+        val workManager = androidx.work.WorkManager.getInstance(context)
+
+        // 1. SABAH ÖZETİ (Her sabah 09:00)
+        val morningRequest = androidx.work.PeriodicWorkRequestBuilder<com.example.mindme.data.notification.MorningSummaryWorker>(
+            24, java.util.concurrent.TimeUnit.HOURS
+        )
+            .setInitialDelay(calculateDelayUntil(9, 0), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+
+        workManager.enqueueUniquePeriodicWork(
+            "morning_summary_work",
+            androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+            morningRequest
+        )
+
+        // 2. AKŞAM ÖZETİ (Her akşam 21:00)
+        val eveningRequest = androidx.work.PeriodicWorkRequestBuilder<com.example.mindme.data.notification.EveningSummaryWorker>(
+            24, java.util.concurrent.TimeUnit.HOURS
+        )
+            .setInitialDelay(calculateDelayUntil(21, 0), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+
+        workManager.enqueueUniquePeriodicWork(
+            "evening_summary_work",
+            androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+            eveningRequest
+        )
+
+        // Test etmek için Logcat'e mesaj basalım
+        android.util.Log.d("MindMe_Test", "✅ Sabah ve Akşam özeti başarıyla planlandı!")
+    }
+
+    // Hedef saate kaç ms kaldığını hesaplayan yardımcı fonksiyon
+    private fun calculateDelayUntil(hour: Int, minute: Int): Long {
+        val now = java.time.LocalDateTime.now()
+        var target = now.withHour(hour).withMinute(minute).withSecond(0)
+
+        // Eğer hedef saat bugün geçmişse, yarına ayarla
+        if (target.isBefore(now)) {
+            target = target.plusDays(1)
+        }
+        return java.time.Duration.between(now, target).toMillis()
     }
 }
 

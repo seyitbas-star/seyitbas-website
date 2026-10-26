@@ -15,6 +15,8 @@ object NotificationHelper {
     private const val CHANNEL_ID = "mindme_reminders"
     private const val CHANNEL_NAME = "Görev Hatırlatıcıları"
     private const val CHANNEL_DESC = "Zamanı gelen görevler için hatırlatıcılar"
+    // YENİ EKLENEN: Günlük özet kanalı
+    private const val DAILY_CHANNEL_ID = "mindme_daily_summary"
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -28,6 +30,15 @@ object NotificationHelper {
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
+            // YENİ: Günlük özet kanalı (Önemi daha düşük olabilir)
+            val dailyChannel = NotificationChannel(
+                DAILY_CHANNEL_ID,
+                "Günlük Özet",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Sabah ve akşam özet bildirimleri"
+            }
+            notificationManager.createNotificationChannel(dailyChannel)
         }
     }
 
@@ -74,6 +85,31 @@ object NotificationHelper {
         try {
             NotificationManagerCompat.from(context)
                 .notify(taskId.hashCode(), builder.build())
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+    fun showDailySummaryNotification(context: Context, title: String, message: String) {
+        // Tıklayınca uygulamayı aç
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, DAILY_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // İkonu değiştirebilirsin
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message)) // Uzun yazılar için
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+
+        try {
+            // Farklı bir ID kullanalım ki görev bildirimleriyle çakışmasın
+            NotificationManagerCompat.from(context).notify(9999, builder.build())
         } catch (e: SecurityException) {
             e.printStackTrace()
         }
