@@ -1,5 +1,6 @@
 package com.example.mindme
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -358,6 +359,7 @@ fun TaskRow(
     var showTimePicker by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val statusIcon = when (task.status) {
         TaskStatus.PENDING -> "⬜"
@@ -505,6 +507,30 @@ fun TaskRow(
                             Text("🔄 Yeniden Planla")
                         }
                     }
+                }
+                // Takvime Ekle Butonu
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_INSERT).apply {
+                        data = android.provider.CalendarContract.Events.CONTENT_URI
+                        putExtra(android.provider.CalendarContract.Events.TITLE, task.title)
+                        putExtra(android.provider.CalendarContract.Events.DESCRIPTION, "MindMe uygulamasından eklendi")
+                        putExtra(
+                            android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME,
+                            task.dueDateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        )
+                        putExtra(
+                            android.provider.CalendarContract.EXTRA_EVENT_END_TIME,
+                            task.dueDateTime.plusHours(1).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        )
+                    }
+                    // 'context' değişkenini yukarıda tanımladığımız için hata vermeyecek
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Takvim uygulaması bulunamadı", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("📅 Takvim", fontSize = 12.sp)
                 }
                 IconButton(onClick = { onDelete(task) }) {
                     Icon(
