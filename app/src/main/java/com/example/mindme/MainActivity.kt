@@ -335,66 +335,27 @@ fun TaskRow(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Üst: ikon + başlık + tarih/saat
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top // Etiketler yukarıdan hizalansın
             ) {
                 Text(text = statusIcon, fontSize = 24.sp)
                 Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = task.title,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            textDecoration = if (task.status == TaskStatus.COMPLETED)
-                                TextDecoration.LineThrough else TextDecoration.None,
-                            color = statusColor
-                        )
-                        // Kategori Etiketi
-                        if (task.category != Category.NONE) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                color = when(task.category) {
-                                    Category.WORK -> Color(0xFFE3F2FD)
-                                    Category.PERSONAL -> Color(0xFFE8F5E9)
-                                    Category.SHOPPING -> Color(0xFFFFF3E0)
-                                    else -> Color.Transparent
-                                },
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = task.category.displayName,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    color = Color.Black
-                                )
-                            }
-                        }
-                        if (task.repeatType != RepeatType.NONE) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = when (task.repeatType) {
-                                        RepeatType.DAILY -> "Günlük"
-                                        RepeatType.WEEKLY -> "Haftalık"
-                                        RepeatType.MONTHLY -> "Aylık"
-                                        RepeatType.YEARLY -> "Yıllık"
-                                        else -> ""
-                                    },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
+
+                // === SOL TARAF: Başlık ve Tarih ===
+                Column(modifier = Modifier.weight(1f)) { // weight(1f) sayesinde kalan alanı kaplar
+                    Text(
+                        text = task.title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        textDecoration = if (task.status == TaskStatus.COMPLETED)
+                            TextDecoration.LineThrough else TextDecoration.None,
+                        color = statusColor
+                    )
+
                     Spacer(modifier = Modifier.height(4.dp))
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "📅 " + task.dueDateTime.format(
@@ -413,6 +374,55 @@ fun TaskRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.clickable { showTimePicker = true }
                         )
+                    }
+                }
+
+                // === SAĞ TARAF: Etiketler (Alt Alta) ===
+                Column(
+                    horizontalAlignment = Alignment.End, // Sağa yasla
+                    verticalArrangement = Arrangement.spacedBy(4.dp) // Etiketler arası boşluk
+                ) {
+                    // Kategori Etiketi
+                    if (task.category != Category.NONE) {
+                        Surface(
+                            color = when(task.category) {
+                                Category.WORK -> Color(0xFFE3F2FD)
+                                Category.PERSONAL -> Color(0xFFE8F5E9)
+                                Category.SHOPPING -> Color(0xFFFFF3E0)
+                                else -> Color.Transparent
+                            },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = task.category.displayName,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                color = Color.Black
+                            )
+                        }
+                    }
+
+                    // Tekrarlayan Görev Etiketi
+                    if (task.repeatType != RepeatType.NONE) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = when (task.repeatType) {
+                                    RepeatType.DAILY -> "Günlük"
+                                    RepeatType.WEEKLY -> "Haftalık"
+                                    RepeatType.MONTHLY -> "Aylık"
+                                    RepeatType.YEARLY -> "Yıllık"
+                                    else -> ""
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                 }
             }
