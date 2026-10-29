@@ -44,11 +44,18 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
             for (task in allTasks) {
                 if (task.status == TaskStatus.PENDING && task.dueDateTime.isBefore(now)) {
+                    // 1. TEKRARLAYAN GÖREV İSE (Günlük, Haftalık vs.)
                     if (task.repeatType != RepeatType.NONE) {
                         val nextDate = ReminderScheduler.getNextOccurrence(task.dueDateTime, task.repeatType)
                         if (nextDate != null) {
+                            // 1. Geçmişe "Yapılmadı" olarak log düş
+                            repository.insertLog(TaskLog(taskTitle = task.title, status = TaskStatus.MISSED))
+
+                            // 2. Görevi bir sonraki tarihe güncelle (PENDING kalır)
                             val updatedTask = task.copy(dueDateTime = nextDate)
                             repository.update(updatedTask)
+
+                            // 3. Yeni tarih için alarmı yeniden kur
                             ReminderScheduler.scheduleReminder(getApplication<Application>(), updatedTask)
                         }
                     } else {
