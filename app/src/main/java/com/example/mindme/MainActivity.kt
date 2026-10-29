@@ -5,11 +5,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -171,18 +173,28 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MindMeScreen(
     modifier: Modifier = Modifier,
-    viewModel: TaskViewModel = viewModel()
+    viewModel: TaskViewModel = viewModel() // <-- BUNUN SİLİNMEDİĞİNDEN EMİN OL
 ) {
+    // Hata veren kısım burasıydı: 'by' ve 'collectAsStateWithLifecycle' eksikti
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val logs by viewModel.logs.collectAsStateWithLifecycle()
+
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var logFilter by remember { mutableStateOf(0) }
+
+    val today = java.time.LocalDate.now()
+
+    // Sadece bugün ve gelecek günlerin görevlerini göster
+    val upcomingTasks = tasks.filter {
+        it.dueDateTime.toLocalDate() >= today
+    }
+
     val filteredTasks = if (searchQuery.isBlank()) {
-        tasks
+        upcomingTasks
     } else {
-        tasks.filter { it.title.contains(searchQuery, ignoreCase = true) }
+        upcomingTasks.filter { it.title.contains(searchQuery, ignoreCase = true) }
     }
 
     Scaffold(
@@ -198,23 +210,13 @@ fun MindMeScreen(
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Checklist,
-                            contentDescription = "Görevler"
-                        )
-                    },
+                    icon = { Icon(Icons.Default.Checklist, contentDescription = "Görevler") },
                     label = { Text("Görevler") }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "Geçmiş"
-                        )
-                    },
+                    icon = { Icon(Icons.Default.History, contentDescription = "Geçmiş") },
                     label = { Text("Geçmiş") }
                 )
             }
@@ -223,23 +225,36 @@ fun MindMeScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(innerPadding) // Alt menünün içeriği kapatmasını engeller
+                .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            Text("MindMe", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-            Text("Let me remind you", fontSize = 14.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
-            Spacer(modifier = Modifier.height(16.dp))
+            // === BAŞLIK VE ARAMA ÇUBUĞU (YAN YANA) ===
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("MindMe", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Text("Let me remind you", fontSize = 12.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
+                }
 
+                if (selectedTab == 0) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Ara...", fontSize = 12.sp) },
+                        modifier = Modifier.width(220.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                        singleLine = true
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // === GÖREVLER SEKMESİ ===
             if (selectedTab == 0) {
-                // === GÖREVLER SEKMESİ ===
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Görevlerde ara...") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
                 if (filteredTasks.isEmpty()) {
                     Text("Görev bulunamadı.", color = Color.Gray)
                 } else {
@@ -253,15 +268,13 @@ fun MindMeScreen(
                                 onDelete = { viewModel.deleteTask(it) },
                                 onDateChange = { t, newDate -> viewModel.updateTaskDate(t, newDate) },
                                 onTimeChange = { t, h, m -> viewModel.updateTaskTime(t, h, m) },
-                                onEditTitle = { t, newTitle -> viewModel.updateTaskTitle(t, newTitle) } // ← YENİ
+                                onEditTitle = { t, newTitle -> viewModel.updateTaskTitle(t, newTitle) }
                             )
                         }
                     }
                 }
             } else {
-                // === GEÇMİŞ (LOG) SEKMESİ ===
-
-                // 1. Filtre Butonları (Tümü / Yapılanlar / Yapılamayanlar)
+                // === GEÇMİŞ SEKMESİ ===
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -293,7 +306,6 @@ fun MindMeScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. Filtrelenmiş Log Listesi
                 val filteredLogs = when (logFilter) {
                     1 -> logs.filter { it.status == TaskStatus.COMPLETED }
                     2 -> logs.filter { it.status == TaskStatus.MISSED }
@@ -353,7 +365,7 @@ fun TaskRow(
     onDelete: (Task) -> Unit = {},
     onDateChange: (Task, java.time.LocalDate) -> Unit = { _, _ -> },
     onTimeChange: (Task, Int, Int) -> Unit = { _, _, _ -> },
-    onEditTitle: (Task, String) -> Unit = { _, _ -> } // ← YENİ
+    onEditTitle: (Task, String) -> Unit = { _, _ -> }
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -372,167 +384,30 @@ fun TaskRow(
         TaskStatus.MISSED -> MaterialTheme.colorScheme.error
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = { /* Normal tıklama yapılırsa bir şey yapma (veya detay aç) */ },
-                onLongClick = { showEditDialog = true } // ← Uzun basınca çalışır
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = when (task.status) {
-                TaskStatus.MISSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                TaskStatus.COMPLETED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                TaskStatus.PENDING -> MaterialTheme.colorScheme.surface
+    // SADECE SOLA KAYDIRMA (SİLME) İÇİN STATE
+    val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = {
+            if (it == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
+                onDelete(task)
+                true
+            } else {
+                false
             }
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Üst: ikon + başlık + tarih/saat
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top // Etiketler yukarıdan hizalansın
-            ) {
-                Text(text = statusIcon, fontSize = 24.sp)
-                Spacer(modifier = Modifier.width(12.dp))
+        }
+    )
 
-                // === SOL TARAF: Başlık ve Tarih ===
-                Column(modifier = Modifier.weight(1f)) { // weight(1f) sayesinde kalan alanı kaplar
-                    Text(
-                        text = task.title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        textDecoration = if (task.status == TaskStatus.COMPLETED)
-                            TextDecoration.LineThrough else TextDecoration.None,
-                        color = statusColor
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "📅 " + task.dueDateTime.format(
-                                DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("tr-TR"))
-                            ),
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clickable { showDatePicker = true }
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "🕐 " + task.dueDateTime.format(
-                                DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("tr-TR"))
-                            ),
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clickable { showTimePicker = true }
-                        )
-                    }
-                }
-
-                // === SAĞ TARAF: Etiketler (Alt Alta) ===
-                Column(
-                    horizontalAlignment = Alignment.End, // Sağa yasla
-                    verticalArrangement = Arrangement.spacedBy(4.dp) // Etiketler arası boşluk
+    androidx.compose.material3.SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            // Sadece kaydırma anında arka planı kırmızı yap ve ikonu göster
+            if (dismissState.dismissDirection != androidx.compose.material3.SwipeToDismissBoxValue.Settled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.CenterEnd
                 ) {
-                    // Kategori Etiketi
-                    if (task.category != Category.NONE) {
-                        Surface(
-                            color = when(task.category) {
-                                Category.WORK -> Color(0xFFE3F2FD)
-                                Category.PERSONAL -> Color(0xFFE8F5E9)
-                                Category.SHOPPING -> Color(0xFFFFF3E0)
-                                else -> Color.Transparent
-                            },
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = task.category.displayName,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                color = Color.Black
-                            )
-                        }
-                    }
-
-                    // Tekrarlayan Görev Etiketi
-                    if (task.repeatType != RepeatType.NONE) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = when (task.repeatType) {
-                                    RepeatType.DAILY -> "Günlük"
-                                    RepeatType.WEEKLY -> "Haftalık"
-                                    RepeatType.MONTHLY -> "Aylık"
-                                    RepeatType.YEARLY -> "Yıllık"
-                                    else -> ""
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (task.status != TaskStatus.COMPLETED) {
-                        TextButton(onClick = { onMarkCompleted(task) }) {
-                            Text("✅ Yaptım")
-                        }
-                    }
-                    if (task.status != TaskStatus.MISSED) {
-                        TextButton(onClick = { onMarkMissed(task) }) {
-                            Text("❌ Yapamadım")
-                        }
-                    }
-                    if (task.status == TaskStatus.MISSED) {
-                        TextButton(onClick = { showReschedulePicker = true }) {
-                            Text("🔄 Yeniden Planla")
-                        }
-                    }
-                }
-                // Takvime Ekle Butonu
-                TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_INSERT).apply {
-                        data = android.provider.CalendarContract.Events.CONTENT_URI
-                        putExtra(android.provider.CalendarContract.Events.TITLE, task.title)
-                        putExtra(android.provider.CalendarContract.Events.DESCRIPTION, "MindMe uygulamasından eklendi")
-                        putExtra(
-                            android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME,
-                            task.dueDateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        )
-                        putExtra(
-                            android.provider.CalendarContract.EXTRA_EVENT_END_TIME,
-                            task.dueDateTime.plusHours(1).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        )
-                    }
-                    // 'context' değişkenini yukarıda tanımladığımız için hata vermeyecek
-                    try {
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        android.widget.Toast.makeText(context, "Takvim uygulaması bulunamadı", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }) {
-                    Text("📅 Takvim", fontSize = 12.sp)
-                }
-                IconButton(onClick = { onDelete(task) }) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Sil",
@@ -540,14 +415,177 @@ fun TaskRow(
                     )
                 }
             }
+        },
+        enableDismissFromStartToEnd = false // Sağa kaydırmayı tamamen kapat
+    ) {
+        // --- KART TASARIMI ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = { },
+                    onLongClick = { showEditDialog = true }
+                ),
+            colors = CardDefaults.cardColors(
+                containerColor = when (task.status) {
+                    TaskStatus.MISSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f) // Şeffaflığı azalttık
+                    TaskStatus.COMPLETED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+                    TaskStatus.PENDING -> MaterialTheme.colorScheme.surface
+                }
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                // ÜST KISIM
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = statusIcon, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = task.title,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textDecoration = if (task.status == TaskStatus.COMPLETED)
+                                TextDecoration.LineThrough else TextDecoration.None,
+                            color = statusColor,
+                            maxLines = 1
+                        )
+
+                        Spacer(modifier = Modifier.height(1.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "📅 " + task.dueDateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("tr-TR"))),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clickable { showDatePicker = true }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "🕐 " + task.dueDateTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("tr-TR"))),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clickable { showTimePicker = true }
+                            )
+                        }
+                    }
+
+                    // Sağ Taraf Etiketler
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                    ) {
+                        if (task.category != Category.NONE) {
+                            Surface(
+                                color = when(task.category) {
+                                    Category.WORK -> Color(0xFFE3F2FD)
+                                    Category.PERSONAL -> Color(0xFFE8F5E9)
+                                    Category.SHOPPING -> Color(0xFFFFF3E0)
+                                    else -> Color.Transparent
+                                },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = task.category.displayName,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    color = Color.Black
+                                )
+                            }
+                        }
+
+                        if (task.repeatType != RepeatType.NONE) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = when (task.repeatType) {
+                                        RepeatType.DAILY -> "Günlük"
+                                        RepeatType.WEEKLY -> "Haftalık"
+                                        RepeatType.MONTHLY -> "Aylık"
+                                        RepeatType.YEARLY -> "Yıllık"
+                                        else -> ""
+                                    },
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // ALT KISIM BUTONLAR
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (task.status != TaskStatus.COMPLETED) {
+                        TextButton(
+                            onClick = { onMarkCompleted(task) },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("✅ Yaptım", fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+                    if (task.status != TaskStatus.MISSED) {
+                        TextButton(
+                            onClick = { onMarkMissed(task) },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("❌ Yapamadım", fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+                    if (task.status == TaskStatus.MISSED) {
+                        TextButton(
+                            onClick = { showReschedulePicker = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("🔄 Yenile", fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_INSERT).apply {
+                                data = android.provider.CalendarContract.Events.CONTENT_URI
+                                putExtra(android.provider.CalendarContract.Events.TITLE, task.title)
+                                putExtra(
+                                    android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME,
+                                    task.dueDateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                )
+                            }
+                            try { context.startActivity(intent) } catch (e: Exception) {}
+                        },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text("📅 Takvim", fontSize = 11.sp, maxLines = 1)
+                    }
+                }
+            }
         }
     }
 
-    // (Tarih, Saat ve Yeniden Planlama Dialogları - Aynı kalacak)
+    // Dialoglar (Aynı kalacak)
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = task.dueDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        )
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = task.dueDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -565,11 +603,7 @@ fun TaskRow(
 
     if (showTimePicker) {
         var isInputMode by remember { mutableStateOf(false) }
-        val timePickerState = rememberTimePickerState(
-            initialHour = task.dueDateTime.hour,
-            initialMinute = task.dueDateTime.minute,
-            is24Hour = true
-        )
+        val timePickerState = rememberTimePickerState(initialHour = task.dueDateTime.hour, initialMinute = task.dueDateTime.minute, is24Hour = true)
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             title = {
@@ -581,9 +615,7 @@ fun TaskRow(
                 }
             },
             text = { if (isInputMode) TimeInput(state = timePickerState) else TimePicker(state = timePickerState) },
-            confirmButton = {
-                TextButton(onClick = { onTimeChange(task, timePickerState.hour, timePickerState.minute); showTimePicker = false }) { Text("Tamam") }
-            },
+            confirmButton = { TextButton(onClick = { onTimeChange(task, timePickerState.hour, timePickerState.minute); showTimePicker = false }) { Text("Tamam") } },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("İptal") } }
         )
     }
@@ -605,41 +637,18 @@ fun TaskRow(
             dismissButton = { TextButton(onClick = { showReschedulePicker = false }) { Text("İptal") } }
         ) { DatePicker(state = datePickerState) }
     }
-    // ✏️ Başlık Düzenleme Dialog
+
     if (showEditDialog) {
         var editTitle by remember { mutableStateOf(task.title) }
-
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
             title = { Text("Görevi Düzenle") },
-            text = {
-                OutlinedTextField(
-                    value = editTitle,
-                    onValueChange = { editTitle = it },
-                    label = { Text("Görev başlığı") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (editTitle.isNotBlank()) {
-                        onEditTitle(task, editTitle)
-                        showEditDialog = false
-                    }
-                }) {
-                    Text("Kaydet")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditDialog = false }) {
-                    Text("İptal")
-                }
-            }
+            text = { OutlinedTextField(value = editTitle, onValueChange = { editTitle = it }, label = { Text("Görev başlığı") }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
+            confirmButton = { TextButton(onClick = { if (editTitle.isNotBlank()) { onEditTitle(task, editTitle); showEditDialog = false } }) { Text("Kaydet") } },
+            dismissButton = { TextButton(onClick = { showEditDialog = false }) { Text("İptal") } }
         )
     }
 }
-
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun AddTaskDialog(
@@ -717,17 +726,24 @@ fun AddTaskDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(text = "Tekrar:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     RepeatType.values().filter { it != RepeatType.NONE }.forEach { type ->
                         val isSelected = selectedRepeat == type
                         Surface(
                             selected = isSelected,
                             onClick = { selectedRepeat = if (isSelected) RepeatType.NONE else type },
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            // Seçiliyse koyu mavi (primary), değilse açık gri (surfaceVariant)
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Box(modifier = Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
                                     text = when (type) {
                                         RepeatType.DAILY -> "Günlük"
@@ -737,8 +753,10 @@ fun AddTaskDialog(
                                         else -> ""
                                     },
                                     fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, // Seçiliyse kalın yazı
                                     maxLines = 1,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    // Seçiliyse beyaz yazı, değilse koyu gri
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
