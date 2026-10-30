@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mindme.data.AppDatabase
 import com.example.mindme.data.Category
 import com.example.mindme.data.RepeatType
+import com.example.mindme.data.SettingsManager
 import com.example.mindme.data.Task
 import com.example.mindme.data.TaskLog
 import com.example.mindme.data.TaskRepository
@@ -20,6 +21,8 @@ import java.time.LocalDateTime
 
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
+
+    private val settingsManager = SettingsManager(application)
     private val repository: TaskRepository
 
     init {
@@ -87,10 +90,33 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     fun addTask(title: String, dueDateTime: LocalDateTime, repeatType: RepeatType = RepeatType.NONE, reminderMinutesBefore: Int = 2, category: Category = Category.NONE) {
         viewModelScope.launch {
             try {
+                // 1. Görevi veritabanına kaydet
                 val newTask = Task(title = title, dueDateTime = dueDateTime, repeatType = repeatType, reminderMinutesBefore = reminderMinutesBefore, category = category)
                 repository.insert(newTask)
+
+                // 2. Alarmı planla
                 ReminderScheduler.scheduleReminder(getApplication<Application>(), newTask)
-            } catch (e: Exception) { e.printStackTrace() }
+
+                // 3. TAKVİM KONTROLÜ
+                val settingsManager = com.example.mindme.data.SettingsManager(getApplication())
+                val shouldAddToCalendar = when (category) {
+                    Category.WORK -> settingsManager.autoCalendarWork.first()
+                    Category.PERSONAL -> settingsManager.autoCalendarPersonal.first()
+                    Category.SHOPPING -> settingsManager.autoCalendarShopping.first()
+                    Category.NONE -> false
+                }
+
+                // 4. Log ile kontrol et
+                android.util.Log.d("MindMe", "Görev Eklendi: ${newTask.title}, Kategori: ${newTask.category}, Takvime Eklenecek mi?: $shouldAddToCalendar")
+
+                // 5. Takvime ekle
+                if (shouldAddToCalendar) {
+                    com.example.mindme.data.notification.CalendarHelper.addTaskToCalendar(getApplication(), newTask)
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

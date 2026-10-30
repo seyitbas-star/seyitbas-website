@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -77,6 +78,7 @@ import com.example.mindme.data.Task
 import com.example.mindme.data.TaskStatus
 import com.example.mindme.data.notification.NotificationHelper
 import com.example.mindme.ui.theme.MindMeTheme
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -173,11 +175,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MindMeScreen(
     modifier: Modifier = Modifier,
-    viewModel: TaskViewModel = viewModel() // <-- BUNUN SİLİNMEDİĞİNDEN EMİN OL
+    viewModel: TaskViewModel = viewModel()
 ) {
-    // Hata veren kısım burasıydı: 'by' ve 'collectAsStateWithLifecycle' eksikti
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val logs by viewModel.logs.collectAsStateWithLifecycle()
+
+    val appContext = androidx.compose.ui.platform.LocalContext.current
 
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
@@ -185,17 +188,8 @@ fun MindMeScreen(
     var logFilter by remember { mutableStateOf(0) }
 
     val today = java.time.LocalDate.now()
-
-    // Sadece bugün ve gelecek günlerin görevlerini göster
-    val upcomingTasks = tasks.filter {
-        it.dueDateTime.toLocalDate() >= today
-    }
-
-    val filteredTasks = if (searchQuery.isBlank()) {
-        upcomingTasks
-    } else {
-        upcomingTasks.filter { it.title.contains(searchQuery, ignoreCase = true) }
-    }
+    val upcomingTasks = tasks.filter { it.dueDateTime.toLocalDate() >= today }
+    val filteredTasks = if (searchQuery.isBlank()) upcomingTasks else upcomingTasks.filter { it.title.contains(searchQuery, ignoreCase = true) }
 
     Scaffold(
         floatingActionButton = {
@@ -219,6 +213,12 @@ fun MindMeScreen(
                     icon = { Icon(Icons.Default.History, contentDescription = "Geçmiş") },
                     label = { Text("Geçmiş") }
                 )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Ayarlar") },
+                    label = { Text("Ayarlar") }
+                )
             }
         }
     ) { innerPadding ->
@@ -228,7 +228,7 @@ fun MindMeScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // === BAŞLIK VE ARAMA ÇUBUĞU (YAN YANA) ===
+            // Başlık ve Arama Çubuğu
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -238,13 +238,12 @@ fun MindMeScreen(
                     Text("MindMe", fontSize = 28.sp, fontWeight = FontWeight.Bold)
                     Text("Let me remind you", fontSize = 12.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
                 }
-
                 if (selectedTab == 0) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         placeholder = { Text("Ara...", fontSize = 12.sp) },
-                        modifier = Modifier.width(220.dp),
+                        modifier = Modifier.width(210.dp),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
                         singleLine = true
                     )
@@ -253,8 +252,9 @@ fun MindMeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // === GÖREVLER SEKMESİ ===
+            // === SEKMELERE GÖRE İÇERİK ===
             if (selectedTab == 0) {
+                // GÖREVLER
                 if (filteredTasks.isEmpty()) {
                     Text("Görev bulunamadı.", color = Color.Gray)
                 } else {
@@ -273,12 +273,9 @@ fun MindMeScreen(
                         }
                     }
                 }
-            } else {
-                // === GEÇMİŞ SEKMESİ ===
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+            } else if (selectedTab == 1) {
+                // GEÇMİŞ
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val filters = listOf("Tümü", "Yapılanlar", "Yapılamayanlar")
                     filters.forEachIndexed { index, title ->
                         val isSelected = logFilter == index
@@ -289,10 +286,7 @@ fun MindMeScreen(
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Box(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(modifier = Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                                 Text(
                                     text = title,
                                     fontSize = 12.sp,
@@ -303,15 +297,12 @@ fun MindMeScreen(
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
-
                 val filteredLogs = when (logFilter) {
                     1 -> logs.filter { it.status == TaskStatus.COMPLETED }
                     2 -> logs.filter { it.status == TaskStatus.MISSED }
                     else -> logs
                 }
-
                 if (filteredLogs.isEmpty()) {
                     Text("Bu filtreye uygun bir işlem geçmişi yok.", color = Color.Gray)
                 } else {
@@ -340,6 +331,80 @@ fun MindMeScreen(
                         }
                     }
                 }
+            } else if (selectedTab == 2) {
+                // === AYARLAR SEKMESİ ===
+
+                // İzin İsteme Launcher'ı
+                val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+                ) { /* İzin sonucu döndüğünde buraya düşer, şimdilik boş */ }
+
+                val requestCalendarPermission = {
+                    if (androidx.core.content.ContextCompat.checkSelfPermission(
+                            appContext,
+                            android.Manifest.permission.WRITE_CALENDAR
+                        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        launcher.launch(
+                            arrayOf(
+                                android.Manifest.permission.READ_CALENDAR,
+                                android.Manifest.permission.WRITE_CALENDAR
+                            )
+                        )
+                    }
+                }
+
+                // Tercihleri oku (Hata veren kısım burasıydı, başa aldık)
+                val settingsManager = remember { com.example.mindme.data.SettingsManager(appContext) }
+                val autoWork by settingsManager.autoCalendarWork.collectAsStateWithLifecycle(initialValue = false)
+                val autoPersonal by settingsManager.autoCalendarPersonal.collectAsStateWithLifecycle(initialValue = false)
+                val autoShopping by settingsManager.autoCalendarShopping.collectAsStateWithLifecycle(initialValue = false)
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Takvim Ayarları", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Aşağıdaki kategorileri seçerseniz, yeni eklenen görevler otomatik olarak telefon takviminize kaydedilir.", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // İŞ GÖREVLERİ
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("İş Görevlerini Takvime Ekle", fontSize = 14.sp)
+                        androidx.compose.material3.Switch(
+                            checked = autoWork,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) requestCalendarPermission()
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { settingsManager.setAutoCalendarWork(isChecked) }
+                            }
+                        )
+                    }
+                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // KİŞİSEL GÖREVLER
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Kişisel Görevleri Takvime Ekle", fontSize = 14.sp)
+                        androidx.compose.material3.Switch(
+                            checked = autoPersonal,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) requestCalendarPermission()
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { settingsManager.setAutoCalendarPersonal(isChecked) }
+                            }
+                        )
+                    }
+                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // ALIŞVERİŞ GÖREVLERİ
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Alışveriş Görevlerini Takvime Ekle", fontSize = 14.sp)
+                        androidx.compose.material3.Switch(
+                            checked = autoShopping,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) requestCalendarPermission()
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { settingsManager.setAutoCalendarShopping(isChecked) }
+                            }
+                        )
+                    }
+                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                }
             }
         }
     }
@@ -367,11 +432,13 @@ fun TaskRow(
     onTimeChange: (Task, Int, Int) -> Unit = { _, _, _ -> },
     onEditTitle: (Task, String) -> Unit = { _, _ -> }
 ) {
+    // BURADAKİ CONTEXT TANIMI ÇOK ÖNEMLİ
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
 
     val statusIcon = when (task.status) {
         TaskStatus.PENDING -> "⬜"
@@ -384,7 +451,6 @@ fun TaskRow(
         TaskStatus.MISSED -> MaterialTheme.colorScheme.error
     }
 
-    // SADECE SOLA KAYDIRMA (SİLME) İÇİN STATE
     val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
         confirmValueChange = {
             if (it == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
@@ -399,7 +465,6 @@ fun TaskRow(
     androidx.compose.material3.SwipeToDismissBox(
         state = dismissState,
         backgroundContent = {
-            // Sadece kaydırma anında arka planı kırmızı yap ve ikonu göster
             if (dismissState.dismissDirection != androidx.compose.material3.SwipeToDismissBoxValue.Settled) {
                 Box(
                     modifier = Modifier
@@ -408,58 +473,38 @@ fun TaskRow(
                         .padding(horizontal = 20.dp),
                     contentAlignment = Alignment.CenterEnd
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Sil",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Sil", tint = MaterialTheme.colorScheme.error)
                 }
             }
         },
-        enableDismissFromStartToEnd = false // Sağa kaydırmayı tamamen kapat
+        enableDismissFromStartToEnd = false
     ) {
-        // --- KART TASARIMI ---
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = { },
-                    onLongClick = { showEditDialog = true }
-                ),
+                .combinedClickable(onClick = { }, onLongClick = { showEditDialog = true }),
             colors = CardDefaults.cardColors(
                 containerColor = when (task.status) {
-                    TaskStatus.MISSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f) // Şeffaflığı azalttık
+                    TaskStatus.MISSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
                     TaskStatus.COMPLETED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
                     TaskStatus.PENDING -> MaterialTheme.colorScheme.surface
                 }
             )
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                // ÜST KISIM
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = statusIcon, fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(6.dp))
-
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = task.title,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
-                            textDecoration = if (task.status == TaskStatus.COMPLETED)
-                                TextDecoration.LineThrough else TextDecoration.None,
+                            textDecoration = if (task.status == TaskStatus.COMPLETED) TextDecoration.LineThrough else TextDecoration.None,
                             color = statusColor,
                             maxLines = 1
                         )
-
                         Spacer(modifier = Modifier.height(1.dp))
-
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "📅 " + task.dueDateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.forLanguageTag("tr-TR"))),
@@ -476,108 +521,47 @@ fun TaskRow(
                             )
                         }
                     }
-
-                    // Sağ Taraf Etiketler
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(1.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         if (task.category != Category.NONE) {
                             Surface(
-                                color = when(task.category) {
-                                    Category.WORK -> Color(0xFFE3F2FD)
-                                    Category.PERSONAL -> Color(0xFFE8F5E9)
-                                    Category.SHOPPING -> Color(0xFFFFF3E0)
-                                    else -> Color.Transparent
-                                },
+                                color = when(task.category) { Category.WORK -> Color(0xFFE3F2FD); Category.PERSONAL -> Color(0xFFE8F5E9); Category.SHOPPING -> Color(0xFFFFF3E0); else -> Color.Transparent },
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
                             ) {
-                                Text(
-                                    text = task.category.displayName,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                    color = Color.Black
-                                )
+                                Text(task.category.displayName, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), color = Color.Black)
                             }
                         }
-
                         if (task.repeatType != RepeatType.NONE) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                            ) {
+                            Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)) {
                                 Text(
-                                    text = when (task.repeatType) {
-                                        RepeatType.DAILY -> "Günlük"
-                                        RepeatType.WEEKLY -> "Haftalık"
-                                        RepeatType.MONTHLY -> "Aylık"
-                                        RepeatType.YEARLY -> "Yıllık"
-                                        else -> ""
-                                    },
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    text = when (task.repeatType) { RepeatType.DAILY -> "Günlük"; RepeatType.WEEKLY -> "Haftalık"; RepeatType.MONTHLY -> "Aylık"; RepeatType.YEARLY -> "Yıllık"; else -> "" },
+                                    fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(2.dp))
-
-                // ALT KISIM BUTONLAR
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
                     if (task.status != TaskStatus.COMPLETED) {
-                        TextButton(
-                            onClick = { onMarkCompleted(task) },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("✅ Yaptım", fontSize = 11.sp, maxLines = 1)
-                        }
+                        TextButton(onClick = { onMarkCompleted(task) }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) { Text("✅ Yaptım", fontSize = 11.sp) }
                     }
                     if (task.status != TaskStatus.MISSED) {
-                        TextButton(
-                            onClick = { onMarkMissed(task) },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("❌ Yapamadım", fontSize = 11.sp, maxLines = 1)
-                        }
+                        TextButton(onClick = { onMarkMissed(task) }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) { Text("❌ Yapamadım", fontSize = 11.sp) }
                     }
                     if (task.status == TaskStatus.MISSED) {
-                        TextButton(
-                            onClick = { showReschedulePicker = true },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("🔄 Yenile", fontSize = 11.sp, maxLines = 1)
-                        }
+                        TextButton(onClick = { showReschedulePicker = true }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) { Text("🔄 Yenile", fontSize = 11.sp) }
                     }
-
                     TextButton(
                         onClick = {
                             val intent = Intent(Intent.ACTION_INSERT).apply {
                                 data = android.provider.CalendarContract.Events.CONTENT_URI
                                 putExtra(android.provider.CalendarContract.Events.TITLE, task.title)
-                                putExtra(
-                                    android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME,
-                                    task.dueDateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-                                )
+                                putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, task.dueDateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
                             }
                             try { context.startActivity(intent) } catch (e: Exception) {}
                         },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Text("📅 Takvim", fontSize = 11.sp, maxLines = 1)
-                    }
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)
+                    ) { Text("📅 Takvim", fontSize = 11.sp) }
                 }
             }
         }
@@ -588,15 +572,7 @@ fun TaskRow(
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = task.dueDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        onDateChange(task, picked)
-                    }
-                    showDatePicker = false
-                }) { Text("Tamam") }
-            },
+            confirmButton = { TextButton(onClick = { datePickerState.selectedDateMillis?.let { millis -> onDateChange(task, Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()) }; showDatePicker = false }) { Text("Tamam") } },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("İptal") } }
         ) { DatePicker(state = datePickerState) }
     }
@@ -606,14 +582,7 @@ fun TaskRow(
         val timePickerState = rememberTimePickerState(initialHour = task.dueDateTime.hour, initialMinute = task.dueDateTime.minute, is24Hour = true)
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Saat Seç")
-                    IconButton(onClick = { isInputMode = !isInputMode }) {
-                        Icon(imageVector = if (isInputMode) Icons.Default.Schedule else Icons.Default.Edit, contentDescription = null)
-                    }
-                }
-            },
+            title = { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Saat Seç"); IconButton(onClick = { isInputMode = !isInputMode }) { Icon(imageVector = if (isInputMode) Icons.Default.Schedule else Icons.Default.Edit, contentDescription = null) } } },
             text = { if (isInputMode) TimeInput(state = timePickerState) else TimePicker(state = timePickerState) },
             confirmButton = { TextButton(onClick = { onTimeChange(task, timePickerState.hour, timePickerState.minute); showTimePicker = false }) { Text("Tamam") } },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("İptal") } }
@@ -624,16 +593,7 @@ fun TaskRow(
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
         DatePickerDialog(
             onDismissRequest = { showReschedulePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        val newDateTime = task.dueDateTime.withYear(picked.year).withMonth(picked.monthValue).withDayOfMonth(picked.dayOfMonth)
-                        onReschedule(task, newDateTime)
-                    }
-                    showReschedulePicker = false
-                }) { Text("Tamam") }
-            },
+            confirmButton = { TextButton(onClick = { datePickerState.selectedDateMillis?.let { millis -> val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate(); onReschedule(task, task.dueDateTime.withYear(picked.year).withMonth(picked.monthValue).withDayOfMonth(picked.dayOfMonth)) }; showReschedulePicker = false }) { Text("Tamam") } },
             dismissButton = { TextButton(onClick = { showReschedulePicker = false }) { Text("İptal") } }
         ) { DatePicker(state = datePickerState) }
     }
