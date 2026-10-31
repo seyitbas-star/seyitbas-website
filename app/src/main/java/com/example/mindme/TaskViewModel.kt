@@ -87,11 +87,17 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    fun addTask(title: String, dueDateTime: LocalDateTime, repeatType: RepeatType = RepeatType.NONE, reminderMinutesBefore: Int = 2, category: Category = Category.NONE) {
+    fun addTask(title: String,
+                description: String = "", // ← YENİ
+                dueDateTime: LocalDateTime,
+                repeatType: RepeatType = RepeatType.NONE,
+                reminderMinutesBefore: Int = 2,
+                category: Category = Category.NONE
+    ) {
         viewModelScope.launch {
             try {
                 // 1. Görevi veritabanına kaydet
-                val newTask = Task(title = title, dueDateTime = dueDateTime, repeatType = repeatType, reminderMinutesBefore = reminderMinutesBefore, category = category)
+                val newTask = Task(title = title, description = description, dueDateTime = dueDateTime, repeatType = repeatType, reminderMinutesBefore = reminderMinutesBefore, category = category)
                 repository.insert(newTask)
 
                 // 2. Alarmı planla

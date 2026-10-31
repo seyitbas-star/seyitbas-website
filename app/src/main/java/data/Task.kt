@@ -10,6 +10,7 @@ data class Task(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
     val title: String,
+    val description: String = "", // ← YENİ EKLENEN ALAN
     val dueDateTime: LocalDateTime,
     val status: TaskStatus = TaskStatus.PENDING,
     val repeatType: RepeatType = RepeatType.NONE,

@@ -412,8 +412,8 @@ fun MindMeScreen(
     if (showAddDialog) {
         AddTaskDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { title, dateTime, repeatType, reminder, category ->
-                viewModel.addTask(title, dateTime, repeatType, reminder, category)
+            onAdd = { title, description, dateTime, repeatType, reminder, category ->
+                viewModel.addTask(title, description,dateTime, repeatType, reminder, category)
                 showAddDialog = false
             }
         )
@@ -492,8 +492,10 @@ fun TaskRow(
             )
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = statusIcon, fontSize = 18.sp)
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    Text(text = statusIcon, fontSize = 18.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )// İkonu 2dp aşağı kaydır)
                     Spacer(modifier = Modifier.width(6.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -504,6 +506,16 @@ fun TaskRow(
                             color = statusColor,
                             maxLines = 1
                         )
+                        // YENİ EKLENEN: Eğer açıklama varsa göster
+                        if (task.description.isNotBlank()) {
+                            Text(
+                                text = task.description,
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                maxLines = 1, // Kart daralmasın diye tek satır
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.height(1.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -613,10 +625,11 @@ fun TaskRow(
 @OptIn(ExperimentalMaterial3Api::class)
 fun AddTaskDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, LocalDateTime, RepeatType, Int, Category) -> Unit
+    onAdd: (String, String, LocalDateTime, RepeatType, Int, Category) -> Unit
 ) {
     var selectedCategory by remember { mutableStateOf(Category.NONE) }
     var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var selectedDateTime by remember { mutableStateOf(LocalDateTime.now().plusHours(1)) }
     var selectedReminder by remember { mutableStateOf(2) }
     var expandedDropdown by remember { mutableStateOf(false) }
@@ -675,6 +688,15 @@ fun AddTaskDialog(
                     label = { Text("Görev başlığı") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Açıklama (İsteğe Bağlı)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3 // Çok uzun olmasın
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(text = "Zaman: ${selectedDateTime.format(dateFormatter)}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -804,7 +826,7 @@ fun AddTaskDialog(
             TextButton(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onAdd(title.trim(), selectedDateTime, selectedRepeat, selectedReminder, selectedCategory)
+                        onAdd(title.trim(), description.trim(), selectedDateTime, selectedRepeat, selectedReminder, selectedCategory)
                     }
                 }
             ) { Text("Ekle") }
